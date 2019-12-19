@@ -24,7 +24,7 @@
 
 const char* ssid     = STASSID;
 const char* password = STAPSK;
-
+const long readingInterval = 10000; //300000 = 5 mins
 #define TOPIC "IoT/esp8266x2"
 
 //Thermistor constants/variables
@@ -34,6 +34,7 @@ float R1 = 10000; //Resistor value of voltage divider constant (ohms)
 float logR2, R2, T;
 float c1 = 1.221849189e-3, c2 = 2.094372171e-4, c3 = 2.785700391e-7; //Steinhart-Hart coefficients from thermistor datasheet
 
+#define Vsense 16
 unsigned long last_reading = 0;
 
 //OTA stuff
@@ -48,6 +49,7 @@ PubSubClient client(WiFiClient);
 
 void callback(char*, byte*, unsigned int);
 float GetTemp();
+bool onBatt = false;
 
 void handleOTA();
 
@@ -55,6 +57,7 @@ void handleOTA();
 void setup() {  
 
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(Vsense, INPUT);
   Serial.begin(115200);
 
   //WiFiManager
@@ -113,7 +116,7 @@ void loop() {
 
   if (client.connected()){
     unsigned long currentMillis = millis();
-    if(!last_reading || currentMillis - last_reading >= 300000) //5 minute delay between sends
+    if(!last_reading || currentMillis - last_reading >= readingInterval) //delay between sends
     {
       float temp = GetTemp();
       last_reading = currentMillis;
@@ -124,7 +127,7 @@ void loop() {
       Serial.print(TOPIC);
       Serial.println("/temperature.");
       client.publish(TOPIC "/temperature", String(temp).c_str());
-      //delay(300000); // Delay 5 minutes
+      client.publish(TOPIC "/BatteryMode", String(onBatt).c_str());
     }
   }
   client.loop();
@@ -133,8 +136,16 @@ void loop() {
 server.handleClient();
 
 //blink LED
-  digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-  delay(500);
+  if(!digitalRead(Vsense)) {
+    onBatt = true;
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+    delay(100);
+  }
+  else{
+    onBatt = false;
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+    delay(500);
+  }
 }
 
 
