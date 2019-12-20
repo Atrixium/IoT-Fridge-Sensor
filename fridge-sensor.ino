@@ -24,8 +24,8 @@
 
 const char* ssid     = STASSID;
 const char* password = STAPSK;
-const long readingInterval = 10000; //300000 = 5 mins
-#define TOPIC "IoT/esp8266x2"
+const long readingInterval = 300000; //300000 = 5 mins
+#define TOPIC "IoT/esp8266"
 
 //Thermistor constants/variables
 #define ThermistorPin A0
@@ -50,6 +50,7 @@ PubSubClient client(WiFiClient);
 void callback(char*, byte*, unsigned int);
 float GetTemp();
 bool onBatt = false;
+bool battAlert = false;
 
 void handleOTA();
 
@@ -130,21 +131,34 @@ void loop() {
       client.publish(TOPIC "/BatteryMode", String(onBatt).c_str());
     }
   }
+
+  // If we enter battery mode, alert immediately
+  if(battAlert == false && onBatt == true){
+    battAlert = true;
+    Serial.println("Power failure detected! Running on batteries...");
+    client.publish(TOPIC "/BatteryMode", String(onBatt).c_str());
+  }
+  else if(battAlert == true && onBatt == false){
+    battAlert = false;
+    Serial.println("Power has returned! Running on mains...");
+    client.publish(TOPIC "/BatteryMode", String(onBatt).c_str());
+  }
+  
   client.loop();
 
 //Handle web requests
 server.handleClient();
 
-//blink LED
+//blink LED based on power status
   if(!digitalRead(Vsense)) {
     onBatt = true;
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    delay(100);
+    delay(1000);
   }
   else{
     onBatt = false;
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    delay(500);
+    delay(250);
   }
 }
 
